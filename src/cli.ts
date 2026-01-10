@@ -1,11 +1,10 @@
 #!/usr/bin/env node
 import { Command } from "commander";
-import chalk from "chalk";
-import { configCommand } from "./commands/config.js";
 import { authCommand } from "./commands/auth.js";
+import { configCommand } from "./commands/config.js";
 import { searchCommand } from "./commands/search.js";
-import { watchlistCommand } from "./commands/watchlist.js";
 import { syncCommand } from "./commands/sync.js";
+import { watchlistCommand } from "./commands/watchlist.js";
 
 const program = new Command();
 

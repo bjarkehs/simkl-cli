@@ -1,11 +1,6 @@
-import { Command } from "commander";
 import chalk from "chalk";
-import {
-  config,
-  getClientId,
-  setClientId,
-  isAuthenticated,
-} from "../config.js";
+import { Command } from "commander";
+import { config, getClientId, isAuthenticated, setClientId } from "../config.js";
 
 export const configCommand = new Command("config")
   .description("Configure API credentials")
@@ -34,11 +29,7 @@ export const configCommand = new Command("config")
       console.log(chalk.dim(`\n  Config file: ${config.path}`));
 
       if (!getClientId()) {
-        console.log(
-          chalk.dim(
-            "\n  Get your API key at: https://simkl.com/settings/developer/"
-          )
-        );
+        console.log(chalk.dim("\n  Get your API key at: https://simkl.com/settings/developer/"));
       }
     }
   });
