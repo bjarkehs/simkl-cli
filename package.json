@@ -46,6 +46,10 @@
   "bugs": {
     "url": "https://github.com/bjarkehs/simkl-cli/issues"
   },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "dependencies": {
     "chalk": "^5.6.2",
     "commander": "^14.0.2",
