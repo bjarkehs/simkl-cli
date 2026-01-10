@@ -1,5 +1,5 @@
-import { Command } from "commander";
 import chalk from "chalk";
+import { Command } from "commander";
 import { getAccessToken, getClientId, isAuthenticated } from "../config.js";
 
 export const syncCommand = new Command("sync")
@@ -18,9 +18,7 @@ export const syncCommand = new Command("sync")
       .option("--tmdb <id>", "TMDB ID")
       .action(async (title, options) => {
         if (!isAuthenticated()) {
-          console.error(
-            chalk.red("Error: Not authenticated. Run `simkl auth` first.")
-          );
+          console.error(chalk.red("Error: Not authenticated. Run `simkl auth` first."));
           process.exit(1);
         }
 
@@ -60,17 +58,13 @@ export const syncCommand = new Command("sync")
               ids: { simkl?: number; imdb?: string };
             }>;
 
-            if (!results || results.length === 0) {
+            const match = results?.[0];
+            if (!match) {
               console.error(chalk.red(`No results found for "${title}"`));
               process.exit(1);
             }
 
-            const match = results[0];
-            console.log(
-              chalk.dim(
-                `Found: ${match.title} (${match.year}) [${match.type}]`
-              )
-            );
+            console.log(chalk.dim(`Found: ${match.title} (${match.year}) [${match.type}]`));
 
             itemToAdd = {
               ids: match.ids,
@@ -91,28 +85,23 @@ export const syncCommand = new Command("sync")
             [endpoint]: [itemToAdd],
           };
 
-          const response = await fetch(
-            "https://api.simkl.com/sync/add-to-list",
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "simkl-api-key": clientId!,
-                Authorization: `Bearer ${token}`,
-              },
-              body: JSON.stringify(syncBody),
-            }
-          );
+          const response = await fetch("https://api.simkl.com/sync/add-to-list", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "simkl-api-key": clientId!,
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify(syncBody),
+          });
 
           if (!response.ok) {
             const errorText = await response.text();
             throw new Error(`Sync failed: ${response.status} - ${errorText}`);
           }
 
-          const result = await response.json();
-          console.log(
-            chalk.green(`✓ Added to ${options.status}`)
-          );
+          await response.json();
+          console.log(chalk.green(`✓ Added to ${options.status}`));
         } catch (error) {
           console.error(chalk.red(`Error: ${error}`));
           process.exit(1);
@@ -128,9 +117,7 @@ export const syncCommand = new Command("sync")
       .option("--at <datetime>", "When watched (ISO 8601)")
       .action(async (title, options) => {
         if (!isAuthenticated()) {
-          console.error(
-            chalk.red("Error: Not authenticated. Run `simkl auth` first.")
-          );
+          console.error(chalk.red("Error: Not authenticated. Run `simkl auth` first."));
           process.exit(1);
         }
 
@@ -158,19 +145,16 @@ export const syncCommand = new Command("sync")
             ids: { simkl?: number; imdb?: string };
           }>;
 
-          if (!results || results.length === 0) {
+          const match = results?.[0];
+          if (!match) {
             console.error(chalk.red(`No results found for "${title}"`));
             process.exit(1);
           }
 
-          const match = results[0];
-          console.log(
-            chalk.dim(`Found: ${match.title} (${match.year}) [${match.type}]`)
-          );
+          console.log(chalk.dim(`Found: ${match.title} (${match.year}) [${match.type}]`));
 
           const type = match.type || options.type || "movie";
-          const endpoint =
-            type === "movie" ? "movies" : type === "tv" ? "shows" : "anime";
+          const endpoint = type === "movie" ? "movies" : type === "tv" ? "shows" : "anime";
 
           const historyItem: Record<string, unknown> = {
             ids: match.ids,
@@ -184,18 +168,15 @@ export const syncCommand = new Command("sync")
             [endpoint]: [historyItem],
           };
 
-          const response = await fetch(
-            "https://api.simkl.com/sync/history",
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "simkl-api-key": clientId!,
-                Authorization: `Bearer ${token}`,
-              },
-              body: JSON.stringify(syncBody),
-            }
-          );
+          const response = await fetch("https://api.simkl.com/sync/history", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "simkl-api-key": clientId!,
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify(syncBody),
+          });
 
           if (!response.ok) {
             const errorText = await response.text();

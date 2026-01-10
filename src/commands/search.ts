@@ -1,6 +1,5 @@
-import { Command } from "commander";
 import chalk from "chalk";
-import { createSimklClient } from "../api/client.js";
+import { Command } from "commander";
 
 interface SearchResult {
   title?: string;
@@ -27,30 +26,7 @@ export const searchCommand = new Command("search")
   .option("--json", "Output raw JSON")
   .action(async (query, options) => {
     try {
-      const client = createSimklClient();
-
-      // Use the search endpoint
-      const params: Record<string, string> = {
-        q: query,
-        limit: options.limit,
-      };
-      if (options.type) {
-        params.type = options.type;
-      }
-
-      const response = await fetch(
-        `https://api.simkl.com/search/${options.type || "all"}?${new URLSearchParams(params)}`,
-        {
-          headers: {
-            "simkl-api-key": process.env.SIMKL_CLIENT_ID || "",
-          },
-        }
-      );
-
-      // Fallback to direct fetch since openapi-fetch needs proper path params
-      const apiKey =
-        (await import("../config.js")).getClientId() ||
-        process.env.SIMKL_CLIENT_ID;
+      const apiKey = (await import("../config.js")).getClientId() || process.env.SIMKL_CLIENT_ID;
       if (!apiKey) {
         console.error(chalk.red("Error: Client ID not configured"));
         process.exit(1);
