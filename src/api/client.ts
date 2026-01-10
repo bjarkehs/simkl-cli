@@ -1,6 +1,6 @@
 import createClient from "openapi-fetch";
-import type { paths } from "./schema.js";
 import { getAccessToken, getClientId } from "../config.js";
+import type { paths } from "./schema.js";
 
 const BASE_URL = "https://api.simkl.com";
 
@@ -9,9 +9,7 @@ export function createSimklClient() {
   const accessToken = getAccessToken();
 
   if (!clientId) {
-    throw new Error(
-      "Client ID not configured. Run `simkl config --client-id <id>` first."
-    );
+    throw new Error("Client ID not configured. Run `simkl config --client-id <id>` first.");
   }
 
   const headers: Record<string, string> = {
@@ -20,7 +18,7 @@ export function createSimklClient() {
   };
 
   if (accessToken) {
-    headers["Authorization"] = `Bearer ${accessToken}`;
+    headers.Authorization = `Bearer ${accessToken}`;
   }
 
   return createClient<paths>({

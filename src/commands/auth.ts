@@ -1,11 +1,6 @@
-import { Command } from "commander";
 import chalk from "chalk";
-import {
-  getClientId,
-  setAccessToken,
-  clearAuth,
-  getAccessToken,
-} from "../config.js";
+import { Command } from "commander";
+import { clearAuth, getAccessToken, getClientId, setAccessToken } from "../config.js";
 
 interface PinResponse {
   device_code: string;
@@ -50,9 +45,7 @@ export const authCommand = new Command("auth")
       console.error(
         chalk.red("Error: Client ID required. Run `simkl config --client-id <id>` first.")
       );
-      console.log(
-        chalk.dim("  Get your API key at: https://simkl.com/settings/developer/")
-      );
+      console.log(chalk.dim("  Get your API key at: https://simkl.com/settings/developer/"));
       process.exit(1);
     }
 
@@ -60,9 +53,7 @@ export const authCommand = new Command("auth")
 
     try {
       // Step 1: Request device code
-      const pinResponse = await fetch(
-        `https://api.simkl.com/oauth/pin?client_id=${clientId}`
-      );
+      const pinResponse = await fetch(`https://api.simkl.com/oauth/pin?client_id=${clientId}`);
 
       if (!pinResponse.ok) {
         throw new Error(`Failed to get PIN: ${pinResponse.statusText}`);

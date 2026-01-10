@@ -1,5 +1,5 @@
-import { Command } from "commander";
 import chalk from "chalk";
+import { Command } from "commander";
 import { getAccessToken, getClientId, isAuthenticated } from "../config.js";
 
 interface WatchlistItem {
@@ -70,9 +70,7 @@ export const watchlistCommand = new Command("watchlist")
 
       if (!response.ok) {
         if (response.status === 401) {
-          console.error(
-            chalk.red("Error: Authentication expired. Run `simkl auth` again.")
-          );
+          console.error(chalk.red("Error: Authentication expired. Run `simkl auth` again."));
           process.exit(1);
         }
         throw new Error(`Failed to fetch watchlist: ${response.statusText}`);
@@ -97,16 +95,12 @@ export const watchlistCommand = new Command("watchlist")
 
           const status = item.status ? chalk.dim(`[${item.status}]`) : "";
           const year = media.year ? chalk.dim(`(${media.year})`) : "";
-          const rating = item.user_rating
-            ? chalk.yellow(`★ ${item.user_rating}`)
-            : "";
+          const rating = item.user_rating ? chalk.yellow(`★ ${item.user_rating}`) : "";
 
           let progress = "";
           if (item.total_episodes_count) {
             const watched = item.watched_episodes_count || 0;
-            progress = chalk.dim(
-              `${watched}/${item.total_episodes_count} eps`
-            );
+            progress = chalk.dim(`${watched}/${item.total_episodes_count} eps`);
           }
 
           console.log(`  ${chalk.green(media.title)} ${year} ${status}`);
@@ -122,9 +116,7 @@ export const watchlistCommand = new Command("watchlist")
       if (data.anime) printItems(data.anime, "Anime");
 
       const total =
-        (data.movies?.length || 0) +
-        (data.shows?.length || 0) +
-        (data.anime?.length || 0);
+        (data.movies?.length || 0) + (data.shows?.length || 0) + (data.anime?.length || 0);
 
       if (total === 0) {
         console.log(chalk.yellow("Your watchlist is empty"));
