@@ -5,9 +5,6 @@ node_modules/
 dist/
 simkl
 
-# Bun
-bun.lock
-
 # IDE
 .idea/
 .vscode/
