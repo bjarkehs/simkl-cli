@@ -1,0 +1,40 @@
+{
+  "name": "simkl-cli",
+  "version": "0.1.0",
+  "description": "CLI for Simkl.com - TV & movie tracking",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "simkl": "dist/cli.js"
+  },
+  "scripts": {
+    "dev": "bun run src/cli.ts",
+    "build": "bun build src/cli.ts --outdir dist --target node",
+    "build:binary": "bun build src/cli.ts --compile --outfile simkl",
+    "typecheck": "tsc --noEmit",
+    "generate:types": "openapi-typescript openapi.json -o src/api/schema.d.ts"
+  },
+  "keywords": [
+    "simkl",
+    "cli",
+    "tv",
+    "movies",
+    "anime",
+    "tracker"
+  ],
+  "author": "Bjarke Søndergaard",
+  "license": "MIT",
+  "dependencies": {
+    "chalk": "^5.6.2",
+    "commander": "^14.0.2",
+    "conf": "^15.0.2",
+    "open-cli": "^8.0.0",
+    "openapi-fetch": "^0.15.0"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.5",
+    "apib2swagger": "^1.17.1",
+    "openapi-typescript": "^7.10.1",
+    "typescript": "^5.9.3"
+  }
+}
