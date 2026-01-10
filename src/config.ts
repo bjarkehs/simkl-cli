@@ -3,7 +3,6 @@ import Conf from "conf";
 interface SimklConfig {
   accessToken?: string;
   clientId?: string;
-  clientSecret?: string;
 }
 
 export const config = new Conf<SimklConfig>({
@@ -11,7 +10,6 @@ export const config = new Conf<SimklConfig>({
   schema: {
     accessToken: { type: "string" },
     clientId: { type: "string" },
-    clientSecret: { type: "string" },
   },
 });
 
@@ -29,14 +27,6 @@ export function getClientId(): string | undefined {
 
 export function setClientId(id: string): void {
   config.set("clientId", id);
-}
-
-export function getClientSecret(): string | undefined {
-  return config.get("clientSecret");
-}
-
-export function setClientSecret(secret: string): void {
-  config.set("clientSecret", secret);
 }
 
 export function clearAuth(): void {

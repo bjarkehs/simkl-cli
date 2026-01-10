@@ -1,20 +1,28 @@
 import { Command } from "commander";
 import chalk from "chalk";
-import { createServer } from "http";
-import open from "open";
 import {
   getClientId,
-  getClientSecret,
   setAccessToken,
   clearAuth,
   getAccessToken,
 } from "../config.js";
 
-const REDIRECT_PORT = 8484;
-const REDIRECT_URI = `http://localhost:${REDIRECT_PORT}/callback`;
+interface PinResponse {
+  device_code: string;
+  user_code: string;
+  verification_url: string;
+  expires_in: number;
+  interval: number;
+}
+
+interface PinStatusResponse {
+  result: "OK" | "KO";
+  message?: string;
+  access_token?: string;
+}
 
 export const authCommand = new Command("auth")
-  .description("Authenticate with Simkl")
+  .description("Authenticate with Simkl using PIN code")
   .option("--logout", "Clear stored authentication")
   .option("--status", "Check authentication status")
   .action(async (options) => {
@@ -37,13 +45,10 @@ export const authCommand = new Command("auth")
     }
 
     const clientId = getClientId();
-    const clientSecret = getClientSecret();
 
-    if (!clientId || !clientSecret) {
+    if (!clientId) {
       console.error(
-        chalk.red(
-          "Error: Client ID and secret required. Run `simkl config` first."
-        )
+        chalk.red("Error: Client ID required. Run `simkl config --client-id <id>` first.")
       );
       console.log(
         chalk.dim("  Get your API key at: https://simkl.com/settings/developer/")
@@ -51,79 +56,60 @@ export const authCommand = new Command("auth")
       process.exit(1);
     }
 
-    console.log(chalk.blue("Starting OAuth flow..."));
+    console.log(chalk.blue("Starting PIN authentication...\n"));
 
-    // Start local server to receive callback
-    const server = createServer(async (req, res) => {
-      const url = new URL(req.url!, `http://localhost:${REDIRECT_PORT}`);
+    try {
+      // Step 1: Request device code
+      const pinResponse = await fetch(
+        `https://api.simkl.com/oauth/pin?client_id=${clientId}`
+      );
 
-      if (url.pathname === "/callback") {
-        const code = url.searchParams.get("code");
+      if (!pinResponse.ok) {
+        throw new Error(`Failed to get PIN: ${pinResponse.statusText}`);
+      }
 
-        if (code) {
-          try {
-            // Exchange code for token
-            const tokenResponse = await fetch(
-              "https://api.simkl.com/oauth/token",
-              {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                  code,
-                  client_id: clientId,
-                  client_secret: clientSecret,
-                  redirect_uri: REDIRECT_URI,
-                  grant_type: "authorization_code",
-                }),
-              }
-            );
+      const pinData = (await pinResponse.json()) as PinResponse;
 
-            const data = (await tokenResponse.json()) as {
-              access_token?: string;
-              error?: string;
-            };
+      // Step 2: Display instructions
+      console.log(chalk.bold("  1. Open: ") + chalk.cyan(pinData.verification_url));
+      console.log(chalk.bold("  2. Enter code: ") + chalk.yellow.bold(pinData.user_code));
+      console.log();
+      console.log(chalk.dim(`  Code expires in ${Math.floor(pinData.expires_in / 60)} minutes`));
+      console.log(chalk.dim("  Waiting for authorization..."));
 
-            if (data.access_token) {
-              setAccessToken(data.access_token);
-              res.writeHead(200, { "Content-Type": "text/html" });
-              res.end(
-                "<html><body><h1>Success!</h1><p>You can close this window.</p></body></html>"
-              );
-              console.log(chalk.green("\n✓ Authentication successful!"));
-            } else {
-              throw new Error(data.error || "Failed to get access token");
-            }
-          } catch (error) {
-            res.writeHead(500, { "Content-Type": "text/html" });
-            res.end(
-              `<html><body><h1>Error</h1><p>${error}</p></body></html>`
-            );
-            console.error(chalk.red(`\nAuthentication failed: ${error}`));
-          }
-        } else {
-          res.writeHead(400, { "Content-Type": "text/html" });
-          res.end("<html><body><h1>Error</h1><p>No code received</p></body></html>");
+      // Step 3: Poll for completion
+      const startTime = Date.now();
+      const expiresAt = startTime + pinData.expires_in * 1000;
+      const pollInterval = (pinData.interval || 5) * 1000;
+
+      while (Date.now() < expiresAt) {
+        await sleep(pollInterval);
+
+        const statusResponse = await fetch(
+          `https://api.simkl.com/oauth/pin/${pinData.user_code}?client_id=${clientId}`
+        );
+
+        if (!statusResponse.ok) {
+          continue;
         }
 
-        // Shutdown server after handling
-        setTimeout(() => {
-          server.close();
-          process.exit(0);
-        }, 1000);
+        const statusData = (await statusResponse.json()) as PinStatusResponse;
+
+        if (statusData.result === "OK" && statusData.access_token) {
+          setAccessToken(statusData.access_token);
+          console.log(chalk.green("\n✓ Authentication successful!"));
+          return;
+        }
       }
-    });
 
-    server.listen(REDIRECT_PORT, () => {
-      const authUrl = `https://simkl.com/oauth/authorize?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}`;
-      console.log(chalk.dim("Opening browser for authentication..."));
-      console.log(chalk.dim(`URL: ${authUrl}\n`));
-      open(authUrl);
-    });
-
-    server.on("error", (err) => {
-      console.error(chalk.red(`Server error: ${err.message}`));
+      console.error(chalk.red("\n✗ Authentication timed out. Please try again."));
       process.exit(1);
-    });
+    } catch (error) {
+      console.error(chalk.red(`\nAuthentication failed: ${error}`));
+      process.exit(1);
+    }
   });
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}

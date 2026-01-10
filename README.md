@@ -14,17 +14,19 @@ bun install -g simkl-cli
 
 ## Setup
 
-1. Get your API credentials at https://simkl.com/settings/developer/
-2. Configure the CLI:
+1. Create an app at https://simkl.com/settings/developer/new
+2. Configure the CLI with your client ID:
 
 ```bash
-simkl config --client-id YOUR_CLIENT_ID --client-secret YOUR_SECRET
+simkl config --client-id YOUR_CLIENT_ID
 ```
 
-3. Authenticate:
+3. Authenticate using PIN code:
 
 ```bash
 simkl auth
+# Opens: https://simkl.com/pin
+# Enter the code shown in CLI
 ```
 
 ## Usage
