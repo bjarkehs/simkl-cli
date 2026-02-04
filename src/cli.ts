@@ -2,6 +2,7 @@
 import { Command } from "commander";
 import { authCommand } from "./commands/auth.js";
 import { configCommand } from "./commands/config.js";
+import { markWatchedCommand } from "./commands/mark-watched.js";
 import { searchCommand } from "./commands/search.js";
 import { syncCommand } from "./commands/sync.js";
 import { watchlistCommand } from "./commands/watchlist.js";
@@ -18,5 +19,6 @@ program.addCommand(authCommand);
 program.addCommand(searchCommand);
 program.addCommand(watchlistCommand);
 program.addCommand(syncCommand);
+program.addCommand(markWatchedCommand);
 
 program.parse();
