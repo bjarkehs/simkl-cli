@@ -15,23 +15,20 @@ interface SearchResult {
 }
 
 export const markWatchedCommand = new Command("mark-watched")
-  .description("Mark episodes as watched")
-  .argument("<show>", "Show title to search for")
-  .option("-s, --season <number>", "Season number", "1")
+  .description("Mark episodes or movies as watched")
+  .argument("<title>", "Show or movie title to search for")
+  .option("-s, --season <number>", "Season number (for TV shows)", "1")
   .option(
     "-e, --episodes <episodes>",
     "Episode numbers to mark as watched (e.g., '1,2,3' or '1-5')",
     "1"
   )
-  .option("-t, --type <type>", "Filter by type: movie, tv, anime", "tv")
-  .option("--imdb <id>", "IMDB ID of the show")
-  .option("--tmdb <id>", "TMDB ID of the show")
-  .option(
-    "--at <datetime>",
-    "When watched (ISO 8601 UTC, e.g., '2024-01-15T20:30:00Z')"
-  )
+  .option("-t, --type <type>", "Type: movie, tv, or anime", "tv")
+  .option("--imdb <id>", "IMDB ID of the show/movie")
+  .option("--tmdb <id>", "TMDB ID of the show/movie")
+  .option("--at <datetime>", "When watched (ISO 8601 UTC, e.g., '2024-01-15T20:30:00Z')")
   .option("--json", "Output raw JSON")
-  .action(async (show, options) => {
+  .action(async (title, options) => {
     if (!isAuthenticated()) {
       console.error(chalk.red("Error: Not authenticated. Run `simkl auth` first."));
       process.exit(1);
@@ -39,23 +36,24 @@ export const markWatchedCommand = new Command("mark-watched")
 
     const token = getAccessToken();
     const clientId = getClientId();
+    const isMovie = options.type === "movie";
 
     try {
-      let showIds: { simkl?: number; imdb?: string; tmdb?: number } | null = null;
+      let ids: { simkl?: number; imdb?: string; tmdb?: number } | null = null;
 
       // If ID is provided directly, use it
       if (options.imdb || options.tmdb) {
-        showIds = {
+        ids = {
           ...(options.imdb && { imdb: options.imdb }),
           ...(options.tmdb && { tmdb: parseInt(options.tmdb, 10) }),
         };
       } else {
-        // Search for the show first
-        console.log(chalk.dim(`Searching for "${show}"...`));
+        // Search for the show/movie first
+        console.log(chalk.dim(`Searching for "${title}"...`));
 
-        const searchType = options.type || "all";
+        const searchType = isMovie ? "movie" : "tv";
         const searchResponse = await fetch(
-          `https://api.simkl.com/search/${searchType}?q=${encodeURIComponent(show)}&limit=1`,
+          `https://api.simkl.com/search/${searchType}?q=${encodeURIComponent(title)}&limit=1`,
           {
             headers: {
               "simkl-api-key": clientId!,
@@ -71,16 +69,16 @@ export const markWatchedCommand = new Command("mark-watched")
 
         const match = results?.[0];
         if (!match) {
-          console.error(chalk.red(`No results found for "${show}"`));
+          console.error(chalk.red(`No results found for "${title}"`));
           process.exit(1);
         }
 
         if (!match.ids?.simkl) {
-          console.error(chalk.red(`Show "${match.title}" does not have a Simkl ID`));
+          console.error(chalk.red(`"${match.title}" does not have a Simkl ID`));
           process.exit(1);
         }
 
-        showIds = {
+        ids = {
           simkl: match.ids.simkl,
           imdb: match.ids.imdb,
           tmdb: match.ids.tmdb ? parseInt(match.ids.tmdb as string, 10) : undefined,
@@ -93,72 +91,111 @@ export const markWatchedCommand = new Command("mark-watched")
         );
       }
 
-      // Parse episode numbers/ranges
-      const episodes = parseEpisodeNumbers(options.episodes);
-      const seasonNumber = parseInt(options.season, 10);
+      let responseData: unknown;
 
-      if (isNaN(seasonNumber) || seasonNumber < 1) {
-        console.error(chalk.red("Error: Season number must be a positive integer"));
-        process.exit(1);
-      }
+      if (isMovie) {
+        // Mark movie as watched
+        console.log(chalk.dim(`Marking "${title}" as watched...`));
 
-      if (episodes.length === 0) {
-        console.error(chalk.red("Error: No valid episode numbers provided"));
-        process.exit(1);
-      }
-
-      console.log(
-        chalk.dim(
-          `Marking season ${seasonNumber}, episodes ${episodes.join(", ")} as watched...`
-        )
-      );
-
-      // Build the episode objects
-      const episodeObjects = episodes.map((ep) => {
-        const episodeObj: Record<string, unknown> = {
-          ids: showIds!,
-          season: seasonNumber,
-          number: ep,
+        const movieObj: Record<string, unknown> = {
+          ids: ids!,
         };
 
         if (options.at) {
-          episodeObj.watched_at = options.at;
+          movieObj.watched_at = options.at;
         }
 
-        return episodeObj;
-      });
+        const syncBody = {
+          movies: [movieObj],
+        };
 
-      const syncBody = {
-        episodes: episodeObjects,
-      };
+        const response = await fetch("https://api.simkl.com/sync/history", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "simkl-api-key": clientId!,
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(syncBody),
+        });
 
-      const response = await fetch("https://api.simkl.com/sync/history", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "simkl-api-key": clientId!,
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(syncBody),
-      });
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Failed to mark movie as watched: ${response.status} - ${errorText}`);
+        }
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to mark episodes as watched: ${response.status} - ${errorText}`);
+        responseData = await response.json();
+
+        if (options.json) {
+          console.log(JSON.stringify(responseData, null, 2));
+          return;
+        }
+
+        console.log(chalk.green("✓ Marked movie as watched"));
+      } else {
+        // Mark episodes as watched (TV shows)
+        const episodes = parseEpisodeNumbers(options.episodes);
+        const seasonNumber = parseInt(options.season, 10);
+
+        if (Number.isNaN(seasonNumber) || seasonNumber < 1) {
+          console.error(chalk.red("Error: Season number must be a positive integer"));
+          process.exit(1);
+        }
+
+        if (episodes.length === 0) {
+          console.error(chalk.red("Error: No valid episode numbers provided"));
+          process.exit(1);
+        }
+
+        console.log(
+          chalk.dim(`Marking season ${seasonNumber}, episodes ${episodes.join(", ")} as watched...`)
+        );
+
+        // Build the episode objects
+        const episodeObjects = episodes.map((ep) => {
+          const episodeObj: Record<string, unknown> = {
+            ids: ids!,
+            season: seasonNumber,
+            number: ep,
+          };
+
+          if (options.at) {
+            episodeObj.watched_at = options.at;
+          }
+
+          return episodeObj;
+        });
+
+        const syncBody = {
+          episodes: episodeObjects,
+        };
+
+        const response = await fetch("https://api.simkl.com/sync/history", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "simkl-api-key": clientId!,
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(syncBody),
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Failed to mark episodes as watched: ${response.status} - ${errorText}`);
+        }
+
+        responseData = await response.json();
+
+        if (options.json) {
+          console.log(JSON.stringify(responseData, null, 2));
+          return;
+        }
+
+        console.log(
+          chalk.green(`✓ Marked ${episodes.length} episode(s) in season ${seasonNumber} as watched`)
+        );
       }
-
-      const responseData = await response.json();
-
-      if (options.json) {
-        console.log(JSON.stringify(responseData, null, 2));
-        return;
-      }
-
-      console.log(
-        chalk.green(
-          `✓ Marked ${episodes.length} episode(s) in season ${seasonNumber} as watched`
-        )
-      );
     } catch (error) {
       console.error(chalk.red(`Error: ${error}`));
       process.exit(1);
@@ -182,10 +219,11 @@ function parseEpisodeNumbers(episodesStr: string): number[] {
     if (trimmed.includes("-")) {
       // Handle range (e.g., "1-5")
       const [startStr, endStr] = trimmed.split("-");
+      if (!startStr || !endStr) continue;
       const start = parseInt(startStr.trim(), 10);
       const end = parseInt(endStr.trim(), 10);
 
-      if (isNaN(start) || isNaN(end) || start < 1 || end < start) {
+      if (Number.isNaN(start) || Number.isNaN(end) || start < 1 || end < start) {
         continue;
       }
 
@@ -195,7 +233,7 @@ function parseEpisodeNumbers(episodesStr: string): number[] {
     } else {
       // Handle single number
       const num = parseInt(trimmed, 10);
-      if (!isNaN(num) && num >= 1) {
+      if (!Number.isNaN(num) && num >= 1) {
         episodes.add(num);
       }
     }
