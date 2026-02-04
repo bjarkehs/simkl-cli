@@ -58,7 +58,7 @@ simkl watchlist --type shows
 simkl watchlist --status watching
 ```
 
-### Sync
+### Sync (Watchlist Management)
 
 ```bash
 # Add to watchlist
@@ -66,9 +66,27 @@ simkl sync add "Dune" --type movie --status plantowatch
 
 # Add using IMDB ID
 simkl sync add "Movie" --imdb tt1234567
+```
 
-# Add to watch history
-simkl sync history "Blade Runner 2049" --type movie
+**Note:** To mark items as watched, use the `watch` command instead of `sync history`.
+
+### Watch (Mark as Watched)
+
+```bash
+# Mark an episode as watched
+simkl watch "Breaking Bad" 1x05
+simkl watch "Breaking Bad" S01E05
+simkl watch "Breaking Bad" 5
+
+# Mark multiple episodes
+simkl watch "Breaking Bad" 1x05,1x06,1x07
+simkl watch "Breaking Bad" 1-5
+
+# Mark a movie as watched
+simkl watch "Dune" --movie
+
+# Mark using ID directly
+simkl watch --imdb tt1234567 --episodes 1x01
 ```
 
 ### Configuration

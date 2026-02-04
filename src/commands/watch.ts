@@ -28,7 +28,7 @@ function parseEpisodeRef(ref: string): { season: number; episodes: number[] } | 
 
   // Handle S##E## or ##x## format
   const sxMatch = cleanRef.match(/s?(\d+)x(\d+)/);
-  if (sxMatch) {
+  if (sxMatch?.[1] && sxMatch[2]) {
     const season = parseInt(sxMatch[1], 10);
     const episode = parseInt(sxMatch[2], 10);
     return { season, episodes: [episode] };
@@ -36,7 +36,7 @@ function parseEpisodeRef(ref: string): { season: number; episodes: number[] } | 
 
   // Handle S##E## format
   const seMatch = cleanRef.match(/s(\d+)e(\d+)/);
-  if (seMatch) {
+  if (seMatch?.[1] && seMatch[2]) {
     const season = parseInt(seMatch[1], 10);
     const episode = parseInt(seMatch[2], 10);
     return { season, episodes: [episode] };
@@ -44,7 +44,7 @@ function parseEpisodeRef(ref: string): { season: number; episodes: number[] } | 
 
   // Handle "season.episode" format
   const dotMatch = cleanRef.match(/^(\d+)\.(\d+)$/);
-  if (dotMatch) {
+  if (dotMatch?.[1] && dotMatch[2]) {
     const season = parseInt(dotMatch[1], 10);
     const episode = parseInt(dotMatch[2], 10);
     return { season, episodes: [episode] };
@@ -52,14 +52,14 @@ function parseEpisodeRef(ref: string): { season: number; episodes: number[] } | 
 
   // Handle single episode number (defaults to season 1)
   const singleMatch = cleanRef.match(/^(\d+)$/);
-  if (singleMatch) {
+  if (singleMatch?.[1]) {
     const episode = parseInt(singleMatch[1], 10);
     return { season: 1, episodes: [episode] };
   }
 
   // Handle range "1-5" or "1:5" (episodes 1-5 in season 1)
   const rangeMatch = cleanRef.match(/^(\d+)[-:](\d+)$/);
-  if (rangeMatch) {
+  if (rangeMatch?.[1] && rangeMatch[2]) {
     const start = parseInt(rangeMatch[1], 10);
     const end = parseInt(rangeMatch[2], 10);
     if (start >= 1 && end >= start) {
@@ -80,7 +80,10 @@ function parseEpisodeRef(ref: string): { season: number; episodes: number[] } | 
  */
 function parseMultipleEpisodeRefs(refs: string): Array<{ season: number; episode: number }> {
   const result: Array<{ season: number; episode: number }> = [];
-  const parts = refs.split(",").map((p) => p.trim()).filter(Boolean);
+  const parts = refs
+    .split(",")
+    .map((p) => p.trim())
+    .filter(Boolean);
 
   for (const part of parts) {
     const parsed = parseEpisodeRef(part);
@@ -145,7 +148,7 @@ export const watchCommand = new Command("watch")
           ...(options.imdb && { imdb: options.imdb }),
           ...(options.tmdb && { tmdb: parseInt(options.tmdb, 10) }),
         };
-      } else if (options.title) {
+      } else if (options.title !== undefined) {
         // Search for the show/movie first
         console.log(chalk.dim(`Searching for "${options.title}"...`));
 
@@ -188,7 +191,9 @@ export const watchCommand = new Command("watch")
           )
         );
       } else {
-        console.error(chalk.red("Error: Title or ID required. Use --title, --imdb, --tmdb, or --simkl."));
+        console.error(
+          chalk.red("Error: Title or ID required. Use --title, --imdb, --tmdb, or --simkl.")
+        );
         process.exit(1);
       }
 
@@ -239,14 +244,18 @@ export const watchCommand = new Command("watch")
 
         if (options.next) {
           // TODO: Fetch next unwatched episode
-          console.error(chalk.red("Error: --next flag not yet implemented. Please specify episode reference."));
+          console.error(
+            chalk.red("Error: --next flag not yet implemented. Please specify episode reference.")
+          );
           process.exit(1);
         } else if (episodeRef) {
           // Parse the episode reference (could be single or multiple via comma)
           const parsed = parseMultipleEpisodeRefs(episodeRef);
           if (parsed.length === 0) {
             console.error(chalk.red(`Error: Invalid episode reference "${episodeRef}"`));
-            console.error(chalk.dim("Use format like: '1x05', 'S01E05', '5', '1-5', or '1x05,1x06'"));
+            console.error(
+              chalk.dim("Use format like: '1x05', 'S01E05', '5', '1-5', or '1x05,1x06'")
+            );
             process.exit(1);
           }
           episodesToMark = parsed;
@@ -276,17 +285,24 @@ export const watchCommand = new Command("watch")
         for (const ep of episodesToMark) {
           const existing = seasonGroups.get(ep.season) || [];
           existing.push(ep.episode);
-          seasonGroups.set(ep.season, existing.sort((a, b) => a - b));
+          seasonGroups.set(
+            ep.season,
+            existing.sort((a, b) => a - b)
+          );
         }
 
         const displayParts: string[] = [];
         for (const [season, episodes] of seasonGroups) {
-          if (episodes.length === 1) {
-            displayParts.push(`S${season}E${episodes[0].toString().padStart(2, "0")}`);
+          const epCount = episodes.length;
+          if (epCount === 0) continue;
+          if (epCount === 1) {
+            displayParts.push(`S${season}E${episodes[0]!.toString().padStart(2, "0")}`);
           } else {
-            const start = episodes[0];
-            const end = episodes[episodes.length - 1];
-            displayParts.push(`S${season}E${start.toString().padStart(2, "0")}-E${end.toString().padStart(2, "0")}`);
+            const start = episodes[0]!;
+            const end = episodes[epCount - 1]!;
+            displayParts.push(
+              `S${season}E${start.toString().padStart(2, "0")}-E${end.toString().padStart(2, "0")}`
+            );
           }
         }
 
@@ -333,9 +349,7 @@ export const watchCommand = new Command("watch")
           return;
         }
 
-        console.log(
-          chalk.green(`✓ Marked ${episodesToMark.length} episode(s) as watched`)
-        );
+        console.log(chalk.green(`✓ Marked ${episodesToMark.length} episode(s) as watched`));
       }
     } catch (error) {
       console.error(chalk.red(`Error: ${error}`));

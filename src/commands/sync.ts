@@ -3,7 +3,7 @@ import { Command } from "commander";
 import { getAccessToken, getClientId, isAuthenticated } from "../config.js";
 
 export const syncCommand = new Command("sync")
-  .description("Add or update items in your watchlist")
+  .description("Manage your watchlist (add items, or use 'watch' to mark as watched)")
   .addCommand(
     new Command("add")
       .description("Add an item to your watchlist")
@@ -110,83 +110,17 @@ export const syncCommand = new Command("sync")
   )
   .addCommand(
     new Command("history")
-      .description("Add item to watch history")
+      .description("Add item to watch history (DEPRECATED: use 'watch' command instead)")
       .argument("<title>", "Title to mark as watched")
       .option("-t, --type <type>", "Type: movie, tv, anime")
       .option("--imdb <id>", "IMDB ID")
       .option("--at <datetime>", "When watched (ISO 8601)")
       .action(async (title, options) => {
-        if (!isAuthenticated()) {
-          console.error(chalk.red("Error: Not authenticated. Run `simkl auth` first."));
-          process.exit(1);
-        }
-
-        const token = getAccessToken();
-        const clientId = getClientId();
-
-        try {
-          // Search first
-          console.log(chalk.dim(`Searching for "${title}"...`));
-
-          const searchType = options.type || "all";
-          const searchResponse = await fetch(
-            `https://api.simkl.com/search/${searchType}?q=${encodeURIComponent(title)}&limit=1`,
-            {
-              headers: {
-                "simkl-api-key": clientId!,
-              },
-            }
-          );
-
-          const results = (await searchResponse.json()) as Array<{
-            title: string;
-            year?: number;
-            type: string;
-            ids: { simkl?: number; imdb?: string };
-          }>;
-
-          const match = results?.[0];
-          if (!match) {
-            console.error(chalk.red(`No results found for "${title}"`));
-            process.exit(1);
-          }
-
-          console.log(chalk.dim(`Found: ${match.title} (${match.year}) [${match.type}]`));
-
-          const type = match.type || options.type || "movie";
-          const endpoint = type === "movie" ? "movies" : type === "tv" ? "shows" : "anime";
-
-          const historyItem: Record<string, unknown> = {
-            ids: match.ids,
-          };
-
-          if (options.at) {
-            historyItem.watched_at = options.at;
-          }
-
-          const syncBody = {
-            [endpoint]: [historyItem],
-          };
-
-          const response = await fetch("https://api.simkl.com/sync/history", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "simkl-api-key": clientId!,
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify(syncBody),
-          });
-
-          if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Sync failed: ${response.status} - ${errorText}`);
-          }
-
-          console.log(chalk.green(`✓ Added "${match.title}" to watch history`));
-        } catch (error) {
-          console.error(chalk.red(`Error: ${error}`));
-          process.exit(1);
-        }
+        console.error(chalk.yellow("Warning: 'simkl sync history' is deprecated."));
+        console.error(chalk.dim("Use 'simkl watch' instead - it has better episode support."));
+        console.error(chalk.dim(""));
+        console.error(chalk.dim("Example:"));
+        console.error(chalk.dim(`  simkl watch "${title}" --type ${options.type || "tv"}`));
+        process.exit(1);
       })
   );
