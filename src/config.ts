@@ -5,7 +5,7 @@ interface SimklConfig {
   clientId?: string;
 }
 
-export const config = new Conf<SimklConfig>({
+const config = new Conf<SimklConfig>({
   projectName: "simkl-cli",
   schema: {
     accessToken: { type: "string" },
@@ -34,5 +34,9 @@ export function clearAuth(): void {
 }
 
 export function isAuthenticated(): boolean {
-  return !!config.get("accessToken") && !!config.get("clientId");
+  return !!config.get("accessToken");
+}
+
+export function getConfigPath(): string {
+  return config.path;
 }
