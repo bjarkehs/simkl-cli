@@ -1,13 +1,40 @@
 import chalk from "chalk";
 import type { Command } from "commander";
 import { api, apiPublic } from "../api.js";
+import type { operations } from "../generated/api-types.js";
 import { dim, heading, info, json, parseEpisodeRef, success } from "../utils.js";
+
+// ── Response types from generated OpenAPI spec ──
+
+type WatchlistResponse = NonNullable<
+  operations["Get all items in the user's watchlist"]["responses"]["200"]["content"]["application/json"]
+>;
+
+type SyncHistoryResponse = NonNullable<
+  operations["Add items to watched/watching history"]["responses"]["200"]["content"]["application/json"]
+>;
+
+type RatingsResponse = NonNullable<
+  operations["Get all user's ratings"]["responses"]["200"]["content"]["application/json"]
+>;
+
+type ItemRatingResponse = NonNullable<
+  operations["Get movie, TV show, or anime rating"]["responses"]["200"]["content"]["application/json"]
+>;
+
+type WatchlistRatingsResponse = NonNullable<
+  operations["Get ratings for the watchlist's items"]["responses"]["200"]["content"]["application/json"]
+>;
 
 // ── Helper: search and pick first result ──
 
-async function resolveItem(
-  opts: Record<string, string | undefined>
-): Promise<{ ids: Record<string, unknown>; title?: string; year?: number } | null> {
+interface ResolvedItem {
+  ids: Record<string, unknown>;
+  title?: string;
+  year?: number;
+}
+
+async function resolveItem(opts: Record<string, string | undefined>): Promise<ResolvedItem | null> {
   // Direct ID provided
   if (opts.simkl) return { ids: { simkl: parseInt(opts.simkl, 10) } };
   if (opts.imdb) return { ids: { imdb: opts.imdb } };
@@ -52,7 +79,7 @@ export function registerWatchlistCommand(program: Command): void {
         date_from: opts.dateFrom,
       };
 
-      const data = await api(`/sync/all-items/${type}/${status}`, {
+      const data = await api<WatchlistResponse>(`/sync/all-items/${type}/${status}`, {
         params,
         authenticated: true,
       });
@@ -62,13 +89,26 @@ export function registerWatchlistCommand(program: Command): void {
         return;
       }
 
-      if (!data || (Array.isArray(data) && data.length === 0)) {
+      if (!data || (typeof data === "object" && Object.keys(data).length === 0)) {
         console.log(dim("  No items in your watchlist."));
         return;
       }
 
       heading(`Watchlist (${type} - ${status}):`);
-      const items = data as Array<Record<string, unknown>>;
+
+      // The response shape depends on the type queried
+      const d = data as Record<string, unknown>;
+      const items =
+        (d.shows as Array<Record<string, unknown>>) ||
+        (d.movies as Array<Record<string, unknown>>) ||
+        (d.anime as Array<Record<string, unknown>>) ||
+        (Array.isArray(data) ? (data as Array<Record<string, unknown>>) : []);
+
+      if (items.length === 0) {
+        console.log(dim("  No items in your watchlist."));
+        return;
+      }
+
       for (const item of items) {
         const show = item.show as Record<string, unknown> | undefined;
         const movie = item.movie as Record<string, unknown> | undefined;
@@ -78,7 +118,6 @@ export function registerWatchlistCommand(program: Command): void {
 
         const title = media.title as string;
         const year = media.year as number;
-        const lastWatched = item.last_watched_at as string | undefined;
         const userRating = item.user_rating as number | undefined;
         const totalEps = item.total_episodes_count as number | undefined;
         const watchedEps = item.watched_episodes_count as number | undefined;
@@ -90,6 +129,7 @@ export function registerWatchlistCommand(program: Command): void {
         if (userRating) {
           line += ` ${chalk.yellow(`★${userRating}`)}`;
         }
+        const lastWatched = item.last_watched_at as string | undefined;
         if (lastWatched) {
           line += ` ${dim(`last: ${lastWatched.split("T")[0]}`)}`;
         }
@@ -125,7 +165,7 @@ export function registerWatchCommand(program: Command): void {
           process.exit(1);
         }
 
-        const body: Record<string, unknown> = {
+        const body = {
           movies: [
             {
               ...item,
@@ -134,7 +174,7 @@ export function registerWatchCommand(program: Command): void {
           ],
         };
 
-        const data = await api("/sync/history", {
+        const data = await api<SyncHistoryResponse>("/sync/history", {
           method: "POST",
           body,
           authenticated: true,
@@ -158,14 +198,12 @@ export function registerWatchCommand(program: Command): void {
       }
 
       const defaultSeason = opts.season ? parseInt(opts.season, 10) : 1;
-      let episodes: Array<{ number: number }>;
 
       if (episodeRef) {
         const ref = parseEpisodeRef(episodeRef, defaultSeason);
-        episodes = ref.episodes.map((n) => ({ number: n }));
-        // Use season from ref if it was explicit (SxxExx format)
+        const episodes = ref.episodes.map((n) => ({ number: n }));
         const season = ref.season;
-        const body: Record<string, unknown> = {
+        const body = {
           shows: [
             {
               ...item,
@@ -182,7 +220,7 @@ export function registerWatchCommand(program: Command): void {
           ],
         };
 
-        const data = await api("/sync/history", {
+        const data = await api<SyncHistoryResponse>("/sync/history", {
           method: "POST",
           body,
           authenticated: true,
@@ -418,7 +456,7 @@ export function registerRatingCommands(program: Command): void {
         date_from: opts.dateFrom,
       };
 
-      const data = await api(`/sync/ratings/${opts.type}/${rating}`, {
+      const data = await api<RatingsResponse>(`/sync/ratings/${opts.type}/${rating}`, {
         method: "POST",
         params,
         authenticated: true,
@@ -430,8 +468,14 @@ export function registerRatingCommands(program: Command): void {
       }
 
       heading("Your Ratings:");
-      const items = data as Array<Record<string, unknown>> | null;
-      if (!items || items.length === 0) {
+      const d = data as Record<string, unknown>;
+      const items =
+        (d.shows as Array<Record<string, unknown>>) ||
+        (d.movies as Array<Record<string, unknown>>) ||
+        (d.anime as Array<Record<string, unknown>>) ||
+        [];
+
+      if (items.length === 0) {
         console.log(dim("  No ratings found."));
         return;
       }
@@ -443,10 +487,10 @@ export function registerRatingCommands(program: Command): void {
         const media = show || movie || anime;
         if (!media) continue;
 
-        const rating = item.rating as number;
-        const ratedAt = item.rated_at as string | undefined;
+        const userRating = item.user_rating as number;
+        const ratedAt = item.user_rated_at as string | undefined;
         console.log(
-          `  ${chalk.yellow(`★${rating}`)} ${chalk.bold(media.title as string)} ${dim(`(${media.year})`)}${ratedAt ? dim(` rated ${ratedAt.split("T")[0]}`) : ""}`
+          `  ${chalk.yellow(`★${userRating}`)} ${chalk.bold(media.title as string)} ${dim(`(${media.year})`)}${ratedAt ? dim(` rated ${ratedAt.split("T")[0]}`) : ""}`
         );
       }
     });
@@ -509,27 +553,24 @@ export function registerRatingCommands(program: Command): void {
         fields: opts.fields || "simkl,ext,rank,reactions,year,has_trailer",
       };
 
-      const data = await apiPublic("/ratings", params);
+      const data = await apiPublic<ItemRatingResponse>("/ratings", params);
 
       if (opts.json) {
         json(data);
         return;
       }
 
-      const d = data as Record<string, unknown>;
       heading("Item Rating:");
-      info("Simkl Link", d.link as string);
-      info("Year", d.release_year as string);
-      info("Rank", (d.rank as Record<string, string>)?.value);
+      info("Simkl Link", data.link);
+      info("Year", data.release_year);
+      info("Rank", data.rank?.value);
 
-      const simklRating = d.simkl as Record<string, number> | undefined;
-      if (simklRating) {
-        console.log(`  Simkl: ${simklRating.rating} (${simklRating.votes} votes)`);
+      if (data.simkl) {
+        console.log(`  Simkl: ${data.simkl.rating} (${data.simkl.votes} votes)`);
       }
 
-      const imdbRating = d.IMDB as Record<string, number> | undefined;
-      if (imdbRating) {
-        console.log(`  IMDB: ${imdbRating.rating} (${imdbRating.votes} votes)`);
+      if (data.IMDB) {
+        console.log(`  IMDB: ${data.IMDB.rating} (${data.IMDB.votes} votes)`);
       }
     });
 
@@ -551,7 +592,7 @@ export function registerRatingCommands(program: Command): void {
         fields: opts.fields || "simkl,ext,rank,release_status,year",
       };
 
-      const data = await api(`/ratings/${type}`, {
+      const data = await api<WatchlistRatingsResponse>(`/ratings/${type}`, {
         params: { ...params },
         authenticated: true,
       });
@@ -562,7 +603,7 @@ export function registerRatingCommands(program: Command): void {
       }
 
       heading(`Watchlist Ratings (${type} - ${opts.status}):`);
-      const items = data as Array<Record<string, unknown>> | null;
+      const items = data as Array<Record<string, unknown>>;
       if (!items || items.length === 0) {
         console.log(dim("  No items found."));
         return;
@@ -570,11 +611,12 @@ export function registerRatingCommands(program: Command): void {
 
       for (const item of items) {
         const simklR = item.simkl as Record<string, unknown> | undefined;
-        const ratingStr = simklR?.rating ? ` ${chalk.yellow(`★${simklR.rating}`)}` : "";
-        const status = item.release_status ? dim(` [${item.release_status}]`) : "";
+        const ratingDisplay = simklR?.rating ? ` ${chalk.yellow(`★${simklR.rating}`)}` : "";
+        const releaseStatus = item.release_status as string | undefined;
+        const statusStr = releaseStatus ? dim(` [${releaseStatus}]`) : "";
         console.log(
           `  ${chalk.bold(String(item.link || `#${item.id}`))} ${dim(`(${item.release_year || "?"})`)}` +
-            `${ratingStr}${status}`
+            `${ratingDisplay}${statusStr}`
         );
       }
     });

@@ -1,6 +1,23 @@
 import type { Command } from "commander";
 import { api, apiPublic } from "../api.js";
+import type { operations } from "../generated/api-types.js";
+import type { MediaItem } from "../utils.js";
 import { dim, heading, info, json, printMediaList } from "../utils.js";
+
+/** Search result from /search/{type} */
+type SearchResponse = NonNullable<
+  operations["Get items based on text query"]["responses"]["200"]["content"]["application/json"]
+>;
+
+/** Search by ID result from /search/id */
+type SearchIdResponse = NonNullable<
+  operations["Get items by ID"]["responses"]["200"]["content"]["application/json"]
+>;
+
+/** File search result from /search/file */
+type FileSearchResponse = NonNullable<
+  operations["Find show, anime or movie by file"]["responses"]["200"]["content"]["application/json"]
+>;
 
 export function registerSearchCommands(program: Command): void {
   // ── Search by text query ──
@@ -23,7 +40,7 @@ export function registerSearchCommands(program: Command): void {
         params.extended = "full";
       }
 
-      const data = await apiPublic(`/search/${opts.type}`, params);
+      const data = await apiPublic<SearchResponse>(`/search/${opts.type}`, params);
 
       if (opts.json) {
         json(data);
@@ -31,7 +48,7 @@ export function registerSearchCommands(program: Command): void {
       }
 
       heading(`Search results for "${query}" (${opts.type}):`);
-      printMediaList(data as Array<Record<string, unknown>>);
+      printMediaList(data as MediaItem[]);
     });
 
   // ── Search by external ID ──
@@ -81,7 +98,7 @@ export function registerSearchCommands(program: Command): void {
       if (opts.year) params.year = opts.year;
       if (opts.type) params.type = opts.type;
 
-      const data = await apiPublic("/search/id", params);
+      const data = await apiPublic<SearchIdResponse>("/search/id", params);
 
       if (opts.json) {
         json(data);
@@ -89,7 +106,7 @@ export function registerSearchCommands(program: Command): void {
       }
 
       heading("Search by ID results:");
-      printMediaList(Array.isArray(data) ? data : [data]);
+      printMediaList(Array.isArray(data) ? (data as MediaItem[]) : [data as MediaItem]);
     });
 
   // ── Search by filename ──
@@ -103,7 +120,7 @@ export function registerSearchCommands(program: Command): void {
       const body: Record<string, unknown> = { file };
       if (opts.part) body.part = parseInt(opts.part, 10);
 
-      const data = await api("/search/file", {
+      const data = await api<FileSearchResponse>("/search/file", {
         method: "POST",
         body,
       });
@@ -172,7 +189,7 @@ export function registerSearchCommands(program: Command): void {
 
       heading("Random pick:");
       if (Array.isArray(data)) {
-        printMediaList(data);
+        printMediaList(data as MediaItem[]);
       } else {
         const d = data as Record<string, unknown>;
         console.log(`  ${d.title || "Unknown"} ${dim(`(${d.year || "?"})`)}`);

@@ -1,7 +1,22 @@
 import chalk from "chalk";
 import type { Command } from "commander";
 import { api, apiPublic } from "../api.js";
+import type { operations } from "../generated/api-types.js";
 import { dim, heading, info, json } from "../utils.js";
+
+// ── Response types from generated OpenAPI spec ──
+
+type UserSettingsResponse = NonNullable<
+  operations["Receive settings"]["responses"]["200"]["content"]["application/json"]
+>;
+
+type UserStatsResponse = NonNullable<
+  operations["Get watched statistics"]["responses"]["201"]["content"]["application/json"]
+>;
+
+type ActivitiesResponse = NonNullable<
+  operations["Get last activity"]["responses"]["200"]["content"]["application/json"]
+>;
 
 export function registerUserCommands(program: Command): void {
   // ── User profile/settings ──
@@ -10,7 +25,7 @@ export function registerUserCommands(program: Command): void {
     .description("View your Simkl profile and settings")
     .option("--json", "Output raw JSON")
     .action(async (opts) => {
-      const data = await api("/users/settings", {
+      const data = await api<UserSettingsResponse>("/users/settings", {
         method: "POST",
         authenticated: true,
       });
@@ -20,23 +35,19 @@ export function registerUserCommands(program: Command): void {
         return;
       }
 
-      const d = data as Record<string, unknown>;
-      const user = d.user as Record<string, unknown> | undefined;
-      const account = d.account as Record<string, unknown> | undefined;
-
       heading("User Profile:");
-      if (user) {
-        info("Name", user.name as string);
-        info("Bio", user.bio as string);
-        info("Location", user.location as string);
-        info("Gender", user.gender as string);
-        info("Age", user.age as string);
-        info("Joined", user.joined_at as string);
+      if (data.user) {
+        info("Name", data.user.name);
+        info("Bio", data.user.bio);
+        info("Location", data.user.loc);
+        info("Gender", data.user.gender);
+        info("Age", data.user.age);
+        info("Joined", data.user.joined_at);
       }
-      if (account) {
-        info("Account ID", account.id as number);
-        info("Timezone", account.timezone as string);
-        info("Type", account.type as string);
+      if (data.account) {
+        info("Account ID", data.account.id);
+        info("Timezone", data.account.timezone);
+        info("Type", data.account.type);
       }
     });
 
@@ -47,19 +58,19 @@ export function registerUserCommands(program: Command): void {
     .argument("[user-id]", "User ID (defaults to authenticated user)")
     .option("--json", "Output raw JSON")
     .action(async (userId, opts) => {
-      let data: unknown;
+      let data: UserStatsResponse;
 
       if (userId) {
-        data = await apiPublic(`/users/${userId}/stats`);
+        data = await apiPublic<UserStatsResponse>(`/users/${userId}/stats`);
       } else {
         // Get own user ID first
-        const settings = (await api("/users/settings", {
+        const settings = await api<UserSettingsResponse>("/users/settings", {
           method: "POST",
           authenticated: true,
-        })) as Record<string, unknown>;
+        });
 
-        const account = settings.account as Record<string, number>;
-        data = await apiPublic(`/users/${account.id}/stats`);
+        const accountId = settings.account?.id;
+        data = await apiPublic<UserStatsResponse>(`/users/${accountId}/stats`);
       }
 
       if (opts.json) {
@@ -131,7 +142,7 @@ export function registerUserCommands(program: Command): void {
     .description("Get last activity timestamps (for sync)")
     .option("--json", "Output raw JSON")
     .action(async (opts) => {
-      const data = await api("/sync/activities", {
+      const data = await api<ActivitiesResponse>("/sync/activities", {
         method: "POST",
         authenticated: true,
       });
@@ -144,8 +155,8 @@ export function registerUserCommands(program: Command): void {
       const d = data as Record<string, unknown>;
       heading("Last Activity:");
 
-      const categories = ["all", "tv_shows", "anime", "movies", "settings"] as const;
-      for (const cat of categories) {
+      const activityCategories = ["all", "tv_shows", "anime", "movies", "settings"] as const;
+      for (const cat of activityCategories) {
         const catData = d[cat] as Record<string, string> | undefined;
         if (!catData) continue;
 

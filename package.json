@@ -1,6 +1,6 @@
 {
   "name": "simkl-cli",
-  "version": "2.0.0",
+  "version": "0.2.0",
   "description": "CLI for Simkl.com - TV, Anime & Movie tracking",
   "type": "module",
   "exports": "./dist/cli.js",
@@ -18,6 +18,7 @@
     "dev": "bun run src/cli.ts",
     "build": "bun build src/cli.ts --outdir dist --target node",
     "build:binary": "bun build src/cli.ts --compile --outfile simkl",
+    "generate:types": "openapi-typescript openapi.json -o src/generated/api-types.ts",
     "typecheck": "tsc --noEmit",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
@@ -58,6 +59,7 @@
     "@biomejs/biome": "^2.3.11",
     "@changesets/cli": "^2.29.8",
     "@types/bun": "^1.3.5",
+    "openapi-typescript": "^7.13.0",
     "typescript": "^5.9.3"
   }
 }

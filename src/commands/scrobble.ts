@@ -1,7 +1,18 @@
 import chalk from "chalk";
 import type { Command } from "commander";
 import { api } from "../api.js";
+import type { operations } from "../generated/api-types.js";
 import { dim, heading, info, json, success } from "../utils.js";
+
+// ── Response types from generated OpenAPI spec ──
+
+type ScrobbleResponse = NonNullable<
+  operations["Start watching"]["responses"]["201"]["content"]["application/json"]
+>;
+
+type PlaybackResponse = NonNullable<
+  operations["Get Playback Sessions"]["responses"]["200"]["content"]["application/json"]
+>;
 
 export function registerScrobbleCommands(program: Command): void {
   const scrobble = program
@@ -24,7 +35,7 @@ export function registerScrobbleCommands(program: Command): void {
     .action(async (opts) => {
       const body = buildScrobbleBody(opts);
 
-      const data = await api("/scrobble/start", {
+      const data = await api<ScrobbleResponse>("/scrobble/start", {
         method: "POST",
         body,
         authenticated: true,
@@ -117,7 +128,7 @@ export function registerPlaybackCommand(program: Command): void {
         date_to: opts.dateTo,
       };
 
-      const data = await api(`/sync/playback/${opts.type}`, {
+      const data = await api<PlaybackResponse>(`/sync/playback/${opts.type}`, {
         params,
         authenticated: true,
       });
@@ -128,12 +139,12 @@ export function registerPlaybackCommand(program: Command): void {
       }
 
       heading("Playback Sessions:");
-      const items = data as Array<Record<string, unknown>> | null;
-      if (!items || items.length === 0) {
+      if (!data || (Array.isArray(data) && data.length === 0)) {
         console.log(dim("  No active playback sessions."));
         return;
       }
 
+      const items = data as Array<Record<string, unknown>>;
       for (const item of items) {
         const show = item.show as Record<string, unknown> | undefined;
         const movie = item.movie as Record<string, unknown> | undefined;
@@ -146,7 +157,7 @@ export function registerPlaybackCommand(program: Command): void {
 
         if (episode) {
           line += dim(
-            ` S${String(episode.season).padStart(2, "0")}E${String(episode.number).padStart(2, "0")}`
+            ` S${String(episode.season).padStart(2, "0")}E${String(episode.number || episode.episode).padStart(2, "0")}`
           );
         }
 

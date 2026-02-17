@@ -1,4 +1,53 @@
 import chalk from "chalk";
+import type { OperationResponse } from "./api.js";
+
+// ── Response types from generated OpenAPI spec ──
+
+/** Search result item (from /search/{type}) */
+export type SearchResult = OperationResponse<"Get items based on text query">;
+
+/** Search by ID result (from /search/id) */
+export type SearchIdResult = OperationResponse<"Get items by ID">;
+
+/** File search result (from /search/file) */
+export type FileSearchResult = OperationResponse<"Find show, anime or movie by file">;
+
+/** Rating info (from /ratings) */
+export type RatingInfo = OperationResponse<"Get movie, TV show, or anime rating">;
+
+/** Watchlist ratings (from /ratings/{type}) */
+export type WatchlistRatingsResult = OperationResponse<"Get ratings for the watchlist's items">;
+
+/** Playback session (from /sync/playback/{type}) */
+export type PlaybackResult = OperationResponse<"Get Playback Sessions">;
+
+/** User settings (from /users/settings) */
+export type UserSettings = OperationResponse<"Receive settings">;
+
+/** User stats (from /users/{user_id}/stats) */
+export type UserStats = OperationResponse<"Get watched statistics">;
+
+// ── Shared interfaces for media display ──
+
+export interface MediaItem {
+  title?: string;
+  year?: number;
+  type?: string;
+  endpoint_type?: string;
+  anime_type?: string;
+  ids?: { simkl_id?: number; simkl?: number; slug?: string };
+  ratings?: {
+    simkl?: { rating?: number; votes?: number };
+    imdb?: { rating?: number; votes?: number };
+    mal?: { rating?: number; votes?: number };
+  };
+  rank?: number | null;
+  status?: string;
+  url?: string;
+  total_episodes?: number;
+  ep_count?: number;
+  poster?: string;
+}
 
 // ── Output helpers ──
 
@@ -43,27 +92,7 @@ export function ratingStr(rating: number | undefined, votes?: number): string {
 
 // ── Table-like list display ──
 
-export function printMediaList(
-  items: Array<{
-    title?: string;
-    year?: number;
-    type?: string;
-    endpoint_type?: string;
-    anime_type?: string;
-    ids?: { simkl_id?: number; simkl?: number; slug?: string };
-    ratings?: {
-      simkl?: { rating?: number; votes?: number };
-      imdb?: { rating?: number; votes?: number };
-      mal?: { rating?: number; votes?: number };
-    };
-    rank?: number | null;
-    status?: string;
-    url?: string;
-    total_episodes?: number;
-    ep_count?: number;
-    poster?: string;
-  }>
-): void {
+export function printMediaList(items: MediaItem[]): void {
   if (!items || items.length === 0) {
     console.log(dim("  No results found."));
     return;
@@ -153,12 +182,4 @@ function parseEpisodeNumbers(input: string): number[] {
     }
   }
   return episodes;
-}
-
-// ── Misc helpers ──
-
-export function requireAuth(token: string | undefined): asserts token is string {
-  if (!token) {
-    throw new Error("Not authenticated. Run: simkl auth");
-  }
 }

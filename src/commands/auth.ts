@@ -10,6 +10,22 @@ import {
   setClientId,
 } from "../config.js";
 
+/** PIN code response from /oauth/pin */
+interface PinResponse {
+  result: string;
+  device_code: string;
+  user_code: string;
+  verification_url: string;
+  expires_in: number;
+  interval: number;
+}
+
+/** PIN check response from /oauth/pin/{USER_CODE} */
+interface PinCheckResponse {
+  result: string;
+  access_token?: string;
+}
+
 export function registerConfigCommand(program: Command): void {
   program
     .command("config")
@@ -77,14 +93,7 @@ export function registerAuthCommand(program: Command): void {
           process.exit(1);
         }
 
-        const pinData = (await pinRes.json()) as {
-          result: string;
-          device_code: string;
-          user_code: string;
-          verification_url: string;
-          expires_in: number;
-          interval: number;
-        };
+        const pinData = (await pinRes.json()) as PinResponse;
 
         console.log();
         console.log(chalk.bold("To authenticate, visit:"));
@@ -106,10 +115,7 @@ export function registerAuthCommand(program: Command): void {
           const checkRes = await fetch(checkUrl);
 
           if (checkRes.ok) {
-            const checkData = (await checkRes.json()) as {
-              result: string;
-              access_token?: string;
-            };
+            const checkData = (await checkRes.json()) as PinCheckResponse;
 
             if (checkData.result === "OK" && checkData.access_token) {
               setAccessToken(checkData.access_token);

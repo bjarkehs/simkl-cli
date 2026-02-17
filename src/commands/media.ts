@@ -1,6 +1,30 @@
 import type { Command } from "commander";
 import { apiPublic } from "../api.js";
+import type { operations } from "../generated/api-types.js";
+import type { MediaItem } from "../utils.js";
 import { dim, heading, info, json, printMediaList, ratingStr } from "../utils.js";
+
+// ── Response types from generated OpenAPI spec ──
+
+type TvDetailResponse = NonNullable<
+  operations["Get detail info about the TV Show"]["responses"]["200"]["content"]["application/json"]
+>;
+
+type TvEpisodesResponse = NonNullable<
+  operations["Get TV Show episodes"]["responses"]["200"]["content"]["application/json"]
+>;
+
+type TvTrendingResponse = NonNullable<
+  operations["Get trending TV series"]["responses"]["200"]["content"]["application/json"]
+>;
+
+type AnimeDetailResponse = NonNullable<
+  operations["Get detail info about the Anime"]["responses"]["200"]["content"]["application/json"]
+>;
+
+type MovieDetailResponse = NonNullable<
+  operations["Get detail info about the movie"]["responses"]["200"]["content"]["application/json"]
+>;
 
 // ── Shared detail display ──
 
@@ -77,7 +101,7 @@ export function registerTvCommands(program: Command): void {
       const params: Record<string, string | number | undefined> = {};
       if (opts.extended) params.extended = "full";
 
-      const data = await apiPublic(`/tv/${id}`, params);
+      const data = await apiPublic<TvDetailResponse>(`/tv/${id}`, params);
 
       if (opts.json) {
         json(data);
@@ -95,7 +119,7 @@ export function registerTvCommands(program: Command): void {
       const params: Record<string, string | number | undefined> = {};
       if (opts.extended) params.extended = "full";
 
-      const data = await apiPublic(`/tv/episodes/${id}`, params);
+      const data = await apiPublic<TvEpisodesResponse>(`/tv/episodes/${id}`, params);
 
       if (opts.json) {
         json(data);
@@ -111,13 +135,13 @@ export function registerTvCommands(program: Command): void {
     .option("-i, --interval <period>", "Time period: today, week, month", "today")
     .option("--json", "Output raw JSON")
     .action(async (opts) => {
-      const data = await apiPublic(`/tv/trending/${opts.interval}`);
+      const data = await apiPublic<TvTrendingResponse>(`/tv/trending/${opts.interval}`);
       if (opts.json) {
         json(data);
         return;
       }
       heading(`Trending TV Shows (${opts.interval}):`);
-      printMediaList(data as Array<Record<string, unknown>>);
+      printMediaList(data as MediaItem[]);
     });
 
   tv.command("best")
@@ -133,7 +157,7 @@ export function registerTvCommands(program: Command): void {
         return;
       }
       heading(`Best TV Shows (${filter}):`);
-      printMediaList(data as Array<Record<string, unknown>>);
+      printMediaList(data as MediaItem[]);
     });
 
   tv.command("premieres")
@@ -149,7 +173,7 @@ export function registerTvCommands(program: Command): void {
         return;
       }
       heading(`TV Premieres (${param}):`);
-      printMediaList(data as Array<Record<string, unknown>>);
+      printMediaList(data as MediaItem[]);
     });
 
   tv.command("airing")
@@ -159,7 +183,7 @@ export function registerTvCommands(program: Command): void {
     .option("--json", "Output raw JSON")
     .action(async (opts) => {
       const params: Record<string, string | number | undefined> = { sort: opts.sort };
-      const data = await apiPublic(`/tv/airing`, { ...params, date: opts.date });
+      const data = await apiPublic("/tv/airing", { ...params, date: opts.date });
       if (opts.json) {
         json(data);
         return;
@@ -198,7 +222,7 @@ export function registerTvCommands(program: Command): void {
         return;
       }
       heading("TV Shows by Genre:");
-      printMediaList(data as Array<Record<string, unknown>>);
+      printMediaList(data as MediaItem[]);
     });
 }
 
@@ -217,7 +241,7 @@ export function registerAnimeCommands(program: Command): void {
       const params: Record<string, string | number | undefined> = {};
       if (opts.extended) params.extended = "full";
 
-      const data = await apiPublic(`/anime/${id}`, params);
+      const data = await apiPublic<AnimeDetailResponse>(`/anime/${id}`, params);
       if (opts.json) {
         json(data);
         return;
@@ -256,7 +280,7 @@ export function registerAnimeCommands(program: Command): void {
         return;
       }
       heading(`Trending Anime (${opts.interval}):`);
-      printMediaList(data as Array<Record<string, unknown>>);
+      printMediaList(data as MediaItem[]);
     });
 
   anime
@@ -273,7 +297,7 @@ export function registerAnimeCommands(program: Command): void {
         return;
       }
       heading(`Best Anime (${filter}):`);
-      printMediaList(data as Array<Record<string, unknown>>);
+      printMediaList(data as MediaItem[]);
     });
 
   anime
@@ -290,7 +314,7 @@ export function registerAnimeCommands(program: Command): void {
         return;
       }
       heading(`Anime Premieres (${param}):`);
-      printMediaList(data as Array<Record<string, unknown>>);
+      printMediaList(data as MediaItem[]);
     });
 
   anime
@@ -301,7 +325,7 @@ export function registerAnimeCommands(program: Command): void {
     .option("--json", "Output raw JSON")
     .action(async (opts) => {
       const params: Record<string, string | number | undefined> = { sort: opts.sort };
-      const data = await apiPublic(`/anime/airing`, { ...params, date: opts.date });
+      const data = await apiPublic("/anime/airing", { ...params, date: opts.date });
       if (opts.json) {
         json(data);
         return;
@@ -339,7 +363,7 @@ export function registerAnimeCommands(program: Command): void {
         return;
       }
       heading("Anime by Genre:");
-      printMediaList(data as Array<Record<string, unknown>>);
+      printMediaList(data as MediaItem[]);
     });
 }
 
@@ -358,7 +382,7 @@ export function registerMovieCommands(program: Command): void {
       const params: Record<string, string | number | undefined> = {};
       if (opts.extended) params.extended = "full";
 
-      const data = await apiPublic(`/movies/${id}`, params);
+      const data = await apiPublic<MovieDetailResponse>(`/movies/${id}`, params);
       if (opts.json) {
         json(data);
         return;
@@ -378,7 +402,7 @@ export function registerMovieCommands(program: Command): void {
         return;
       }
       heading(`Trending Movies (${opts.interval}):`);
-      printMediaList(data as Array<Record<string, unknown>>);
+      printMediaList(data as MediaItem[]);
     });
 
   movie
@@ -403,6 +427,6 @@ export function registerMovieCommands(program: Command): void {
         return;
       }
       heading("Movies by Genre:");
-      printMediaList(data as Array<Record<string, unknown>>);
+      printMediaList(data as MediaItem[]);
     });
 }
