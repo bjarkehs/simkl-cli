@@ -1,6 +1,6 @@
 {
   "name": "simkl-cli",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "CLI for Simkl.com - TV, Anime & Movie tracking",
   "type": "module",
   "exports": "./dist/cli.js",
