@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import chalk from "chalk";
 import { Command } from "commander";
+import pkg from "../package.json" with { type: "json" };
 import { SimklApiError } from "./api.js";
 import { registerAuthCommand, registerConfigCommand } from "./commands/auth.js";
 import {
@@ -25,7 +26,7 @@ const program = new Command();
 program
   .name("simkl")
   .description("CLI for Simkl.com - TV, Anime & Movie tracking")
-  .version("0.2.0");
+  .version(pkg.version);
 
 // ── Configuration & Auth ──
 registerConfigCommand(program);
