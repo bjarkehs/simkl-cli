@@ -1,5 +1,11 @@
 # simkl-cli
 
+## 0.3.1
+
+### Patch Changes
+
+- af53ea1: Fix: derive CLI version from package.json so releases via Changesets automatically update `simkl --version`.
+
 ## 0.3.0
 
 ### Minor Changes
