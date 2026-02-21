@@ -155,7 +155,10 @@ export function registerWatchCommand(program: Command): void {
     .option("--at <datetime>", "When watched (ISO 8601)")
     .option("--json", "Output raw JSON")
     .action(async (title, episodeRef, opts) => {
-      if (title) {
+      const hasId = opts.imdb || opts.tmdb || opts.simkl || opts.mal;
+      if (title && !episodeRef && hasId) {
+        episodeRef = title;
+      } else if (title) {
         opts.title = title;
       }
 
