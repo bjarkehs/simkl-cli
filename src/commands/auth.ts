@@ -1,8 +1,18 @@
 import chalk from "chalk";
-import { Command } from "commander";
-import { clearAuth, getAccessToken, getClientId, setAccessToken } from "../config.js";
+import type { Command } from "commander";
+import {
+  clearAuth,
+  getAccessToken,
+  getClientId,
+  getConfigPath,
+  isAuthenticated,
+  setAccessToken,
+  setClientId,
+} from "../config.js";
 
+/** PIN code response from /oauth/pin */
 interface PinResponse {
+  result: string;
   device_code: string;
   user_code: string;
   verification_url: string;
@@ -10,97 +20,118 @@ interface PinResponse {
   interval: number;
 }
 
-interface PinStatusResponse {
-  result: "OK" | "KO";
-  message?: string;
+/** PIN check response from /oauth/pin/{USER_CODE} */
+interface PinCheckResponse {
+  result: string;
   access_token?: string;
 }
 
-export const authCommand = new Command("auth")
-  .description("Authenticate with Simkl using PIN code")
-  .option("--logout", "Clear stored authentication")
-  .option("--status", "Check authentication status")
-  .action(async (options) => {
-    if (options.logout) {
-      clearAuth();
-      console.log(chalk.green("✓ Logged out successfully"));
-      return;
-    }
-
-    if (options.status) {
-      const token = getAccessToken();
-      if (token) {
-        console.log(chalk.green("✓ Authenticated"));
-        console.log(chalk.dim(`  Token: ${token.slice(0, 8)}...`));
-      } else {
-        console.log(chalk.yellow("Not authenticated"));
-        console.log(chalk.dim("  Run `simkl auth` to log in"));
-      }
-      return;
-    }
-
-    const clientId = getClientId();
-
-    if (!clientId) {
-      console.error(
-        chalk.red("Error: Client ID required. Run `simkl config --client-id <id>` first.")
-      );
-      console.log(chalk.dim("  Get your API key at: https://simkl.com/settings/developer/"));
-      process.exit(1);
-    }
-
-    console.log(chalk.blue("Starting PIN authentication...\n"));
-
-    try {
-      // Step 1: Request device code
-      const pinResponse = await fetch(`https://api.simkl.com/oauth/pin?client_id=${clientId}`);
-
-      if (!pinResponse.ok) {
-        throw new Error(`Failed to get PIN: ${pinResponse.statusText}`);
+export function registerConfigCommand(program: Command): void {
+  program
+    .command("config")
+    .description("Configure the CLI")
+    .option("--client-id <id>", "Set your Simkl API client ID")
+    .option("--show", "Show current configuration")
+    .option("--path", "Show config file path")
+    .action((opts) => {
+      if (opts.clientId) {
+        setClientId(opts.clientId);
+        console.log(chalk.green("Client ID saved."));
       }
 
-      const pinData = (await pinResponse.json()) as PinResponse;
+      if (opts.path) {
+        console.log(getConfigPath());
+      }
 
-      // Step 2: Display instructions
-      console.log(chalk.bold("  1. Open: ") + chalk.cyan(pinData.verification_url));
-      console.log(chalk.bold("  2. Enter code: ") + chalk.yellow.bold(pinData.user_code));
-      console.log();
-      console.log(chalk.dim(`  Code expires in ${Math.floor(pinData.expires_in / 60)} minutes`));
-      console.log(chalk.dim("  Waiting for authorization..."));
-
-      // Step 3: Poll for completion
-      const startTime = Date.now();
-      const expiresAt = startTime + pinData.expires_in * 1000;
-      const pollInterval = (pinData.interval || 5) * 1000;
-
-      while (Date.now() < expiresAt) {
-        await sleep(pollInterval);
-
-        const statusResponse = await fetch(
-          `https://api.simkl.com/oauth/pin/${pinData.user_code}?client_id=${clientId}`
+      if (opts.show || (!opts.clientId && !opts.path)) {
+        console.log(chalk.bold("Current configuration:"));
+        console.log(`  Client ID: ${getClientId() || chalk.dim("not set")}`);
+        console.log(
+          `  Auth token: ${getAccessToken() ? chalk.green("configured") : chalk.dim("not set")}`
         );
+        console.log(`  Config path: ${chalk.dim(getConfigPath())}`);
+      }
+    });
+}
 
-        if (!statusResponse.ok) {
-          continue;
-        }
-
-        const statusData = (await statusResponse.json()) as PinStatusResponse;
-
-        if (statusData.result === "OK" && statusData.access_token) {
-          setAccessToken(statusData.access_token);
-          console.log(chalk.green("\n✓ Authentication successful!"));
-          return;
-        }
+export function registerAuthCommand(program: Command): void {
+  program
+    .command("auth")
+    .description("Authenticate with Simkl using PIN")
+    .option("--logout", "Clear saved authentication")
+    .option("--status", "Check authentication status")
+    .action(async (opts) => {
+      if (opts.logout) {
+        clearAuth();
+        console.log(chalk.green("Logged out successfully."));
+        return;
       }
 
-      console.error(chalk.red("\n✗ Authentication timed out. Please try again."));
-      process.exit(1);
-    } catch (error) {
-      console.error(chalk.red(`\nAuthentication failed: ${error}`));
-      process.exit(1);
-    }
-  });
+      if (opts.status) {
+        if (isAuthenticated()) {
+          console.log(chalk.green("Authenticated."));
+        } else {
+          console.log(chalk.yellow("Not authenticated. Run: simkl auth"));
+        }
+        return;
+      }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+      const clientId = getClientId();
+      if (!clientId) {
+        console.error(
+          chalk.red("Client ID not configured. Run: simkl config --client-id <your-id>")
+        );
+        process.exit(1);
+      }
+
+      try {
+        // Step 1: Get PIN code
+        const pinUrl = `https://api.simkl.com/oauth/pin?client_id=${encodeURIComponent(clientId)}`;
+        const pinRes = await fetch(pinUrl);
+        if (!pinRes.ok) {
+          console.error(chalk.red(`Failed to get PIN: ${pinRes.statusText}`));
+          process.exit(1);
+        }
+
+        const pinData = (await pinRes.json()) as PinResponse;
+
+        console.log();
+        console.log(chalk.bold("To authenticate, visit:"));
+        console.log(chalk.cyan(`  ${pinData.verification_url}`));
+        console.log();
+        console.log(chalk.bold("Enter this code:"));
+        console.log(chalk.yellow.bold(`  ${pinData.user_code}`));
+        console.log();
+        console.log(chalk.dim("Waiting for authorization..."));
+
+        // Step 2: Poll for authorization
+        const interval = (pinData.interval || 5) * 1000;
+        const expiresAt = Date.now() + pinData.expires_in * 1000;
+
+        while (Date.now() < expiresAt) {
+          await new Promise((resolve) => setTimeout(resolve, interval));
+
+          const checkUrl = `https://api.simkl.com/oauth/pin/${pinData.user_code}?client_id=${encodeURIComponent(clientId)}`;
+          const checkRes = await fetch(checkUrl);
+
+          if (checkRes.ok) {
+            const checkData = (await checkRes.json()) as PinCheckResponse;
+
+            if (checkData.result === "OK" && checkData.access_token) {
+              setAccessToken(checkData.access_token);
+              console.log(chalk.green("\nAuthenticated successfully!"));
+              return;
+            }
+          }
+        }
+
+        console.error(chalk.red("\nAuthorization timed out. Please try again."));
+        process.exit(1);
+      } catch (err) {
+        console.error(
+          chalk.red(`Authentication failed: ${err instanceof Error ? err.message : err}`)
+        );
+        process.exit(1);
+      }
+    });
 }
