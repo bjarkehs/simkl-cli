@@ -134,7 +134,25 @@ export interface EpisodeRef {
 }
 
 export function parseEpisodeRef(ref: string, defaultSeason: number = 1): EpisodeRef {
-  // Format: S01E05 or 1x05
+  if (ref.includes(",")) {
+    const parts = ref.split(",").map((s) => s.trim());
+    const parsed = parts.map((p) => parseSingleEpisodeRef(p, defaultSeason));
+    const seasons = new Set(parsed.map((p) => p.season));
+    if (seasons.size > 1) {
+      throw new Error(
+        `Mixed seasons in episode list: "${ref}". Use separate commands for different seasons.`
+      );
+    }
+    return {
+      season: parsed[0]!.season,
+      episodes: parsed.flatMap((p) => p.episodes),
+    };
+  }
+
+  return parseSingleEpisodeRef(ref, defaultSeason);
+}
+
+function parseSingleEpisodeRef(ref: string, defaultSeason: number): EpisodeRef {
   const seMatch = ref.match(/^[Ss](\d+)[Ee](\d+)$/);
   if (seMatch) {
     return { season: parseInt(seMatch[1]!, 10), episodes: [parseInt(seMatch[2]!, 10)] };
@@ -145,13 +163,18 @@ export function parseEpisodeRef(ref: string, defaultSeason: number = 1): Episode
     return { season: parseInt(xMatch[1]!, 10), episodes: [parseInt(xMatch[2]!, 10)] };
   }
 
-  // Range: 1-5 or 1,2,3
-  if (ref.includes("-") || ref.includes(",")) {
-    const episodes = parseEpisodeNumbers(ref);
+  if (ref.includes("-")) {
+    const [startStr = "", endStr = ""] = ref.split("-");
+    const start = parseInt(startStr, 10);
+    const end = parseInt(endStr, 10);
+    if (Number.isNaN(start) || Number.isNaN(end)) throw new Error(`Invalid range: "${ref}"`);
+    const episodes: number[] = [];
+    for (let i = start; i <= end; i++) {
+      episodes.push(i);
+    }
     return { season: defaultSeason, episodes };
   }
 
-  // Single number
   const num = parseInt(ref, 10);
   if (!Number.isNaN(num)) {
     return { season: defaultSeason, episodes: [num] };
@@ -160,26 +183,4 @@ export function parseEpisodeRef(ref: string, defaultSeason: number = 1): Episode
   throw new Error(
     `Invalid episode reference: "${ref}". Use formats like: 5, 1x05, S01E05, 1-5, 1,3,5`
   );
-}
-
-function parseEpisodeNumbers(input: string): number[] {
-  const episodes: number[] = [];
-  const parts = input.split(",");
-  for (const part of parts) {
-    const trimmed = part.trim();
-    if (trimmed.includes("-")) {
-      const [startStr = "", endStr = ""] = trimmed.split("-");
-      const start = parseInt(startStr, 10);
-      const end = parseInt(endStr, 10);
-      if (Number.isNaN(start) || Number.isNaN(end)) throw new Error(`Invalid range: "${trimmed}"`);
-      for (let i = start; i <= end; i++) {
-        episodes.push(i);
-      }
-    } else {
-      const num = parseInt(trimmed, 10);
-      if (Number.isNaN(num)) throw new Error(`Invalid episode number: "${trimmed}"`);
-      episodes.push(num);
-    }
-  }
-  return episodes;
 }

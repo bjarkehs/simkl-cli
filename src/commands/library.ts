@@ -144,8 +144,8 @@ export function registerWatchCommand(program: Command): void {
   program
     .command("watch")
     .description("Mark episodes or movies as watched")
+    .argument("[title]", "Show/movie title")
     .argument("[episode-ref]", "Episode reference: 5, 1x05, S01E05, 1-5, 1,3,5")
-    .option("--title <title>", "Show/movie title to search")
     .option("--movie", "Mark a movie as watched")
     .option("--season <n>", "Season number (default: 1)")
     .option("--imdb <id>", "IMDB ID")
@@ -154,13 +154,17 @@ export function registerWatchCommand(program: Command): void {
     .option("--mal <id>", "MAL ID")
     .option("--at <datetime>", "When watched (ISO 8601)")
     .option("--json", "Output raw JSON")
-    .action(async (episodeRef, opts) => {
+    .action(async (title, episodeRef, opts) => {
+      if (title) {
+        opts.title = title;
+      }
+
       if (opts.movie) {
         // Mark movie as watched
         const item = await resolveItem(opts);
         if (!item) {
           console.error(
-            chalk.red("Could not find movie. Provide --title, --imdb, --tmdb, or --simkl.")
+            chalk.red("Could not find movie. Provide a title or --imdb, --tmdb, --simkl.")
           );
           process.exit(1);
         }
@@ -192,7 +196,7 @@ export function registerWatchCommand(program: Command): void {
       const item = await resolveItem(opts);
       if (!item) {
         console.error(
-          chalk.red("Could not find show. Provide --title, --imdb, --tmdb, or --simkl.")
+          chalk.red("Could not find show. Provide a title or --imdb, --tmdb, --simkl.")
         );
         process.exit(1);
       }
@@ -236,9 +240,7 @@ export function registerWatchCommand(program: Command): void {
           `Marked S${String(season).padStart(2, "0")} episodes [${epList}] as watched${item.title ? ` for ${item.title}` : ""}`
         );
       } else {
-        console.error(
-          chalk.red("Provide an episode reference: simkl watch 1x05 --title 'Show Name'")
-        );
+        console.error(chalk.red('Provide an episode reference: simkl watch "Show Name" 1x05'));
         process.exit(1);
       }
     });

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import chalk from "chalk";
 import { Command } from "commander";
+import { SimklApiError } from "./api.js";
 import { registerAuthCommand, registerConfigCommand } from "./commands/auth.js";
 import {
   registerCheckinCommand,
@@ -66,6 +67,9 @@ async function main() {
       console.error(chalk.red(`Error: ${err.message}`));
       if (process.env.DEBUG) {
         console.error(err.stack);
+        if (err instanceof SimklApiError && err.body) {
+          console.error(chalk.dim("Response body:"), JSON.stringify(err.body, null, 2));
+        }
       }
     } else {
       console.error(chalk.red("An unexpected error occurred."));
