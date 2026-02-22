@@ -51,10 +51,10 @@ jobs:
         with:
           bun-version: latest
 
-      - name: Setup Node.js
+      - name: Setup Node.js (latest LTS)
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "lts/*"
           registry-url: "https://registry.npmjs.org"
 
       - name: Install dependencies
